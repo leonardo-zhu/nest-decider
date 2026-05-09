@@ -1,3 +1,4 @@
+import OpenAI from 'openai'
 import { env } from './env.js'
 import { fail } from './errors.js'
 import { arrivalRange, nearbyPoi, transitRoute } from './amap-client.js'
@@ -57,6 +58,7 @@ export async function refreshFixedCommuteForAll() {
   const updated = [...rows]
   const queue = [...rows.entries()]
   const workerCount = Math.max(1, Math.floor(env.commuteConcurrency))
+
   const workers = Array.from({ length: workerCount }, async () => {
     while (queue.length > 0) {
       const next = queue.shift()
@@ -70,8 +72,8 @@ export async function refreshFixedCommuteForAll() {
       }
     }
   })
-  await Promise.all(workers)
 
+  await Promise.all(workers)
   await store.writeProperties(updated)
 
   return {
@@ -226,7 +228,7 @@ export async function evaluateWithLLM(input: {
   mode: 'single' | 'compare'
   propertyIds: string[]
   customPrompt?: string
-  provider?: 'openai' | 'claude' | 'doubao'
+  provider?: 'openai' | 'doubao'
 }) {
   const rows = await store.readProperties()
   const selected = rows.filter((item) => input.propertyIds.includes(item.id))
@@ -234,54 +236,71 @@ export async function evaluateWithLLM(input: {
     fail(400, 'NO_PROPERTIES_SELECTED', 'no valid properties selected')
   }
 
+  const provider = input.provider ?? (env.aiProvider as 'openai' | 'doubao')
   const systemPrompt =
     '你是租房决策助手。请基于输入的结构化数据，输出可执行、具体、简洁的建议。重点比较通勤、租金、面积、燃气、水电、配套和风险点。'
   const userPrompt = input.customPrompt ?? '请给出最终建议，并说明理由与潜在风险。'
-  const provider = input.provider ?? (env.aiProvider as 'openai' | 'claude' | 'doubao')
   const payloadText = JSON.stringify({ mode: input.mode, properties: selected, question: userPrompt }, null, 2)
 
-  if (provider === 'claude') {
-    if (!env.claudeApiKey) fail(500, 'AI_KEY_MISSING', 'CLAUDE_API_KEY is not set')
-    const response = await fetch(`${env.claudeBaseUrl.replace(/\/$/, '')}/messages`, {
+  if (provider === 'doubao') {
+    if (!env.doubaoApiKey) fail(500, 'AI_KEY_MISSING', 'DOUBAO_API_KEY is not set')
+    const response = await fetch(`${env.doubaoBaseUrl.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-api-key': env.claudeApiKey,
-        'anthropic-version': '2023-06-01',
+        authorization: `Bearer ${env.doubaoApiKey}`,
       },
       body: JSON.stringify({
-        model: env.claudeModel,
-        max_tokens: 1200,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: payloadText }],
+        model: env.doubaoModel,
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: payloadText },
+        ],
       }),
     })
+
     if (!response.ok) fail(502, 'AI_UPSTREAM_ERROR', await response.text())
-    const json = (await response.json()) as { content?: Array<{ text?: string }>; usage?: Record<string, unknown> }
-    const result = json.content?.map((item) => item.text ?? '').join('\n').trim()
+
+    const json = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>
+      usage?: Record<string, unknown>
+    }
+
+    const result = json.choices?.[0]?.message?.content?.trim()
     if (!result) fail(502, 'AI_EMPTY_RESPONSE', 'ai response is empty')
-    return { mode: input.mode, provider, propertyIds: input.propertyIds, model: env.claudeModel, result, usage: json.usage ?? null }
+
+    return {
+      mode: input.mode,
+      provider,
+      propertyIds: input.propertyIds,
+      model: env.doubaoModel,
+      result,
+      usage: json.usage ?? null,
+    }
   }
 
-  const baseUrl = provider === 'doubao' ? env.doubaoBaseUrl : env.aiBaseUrl
-  const apiKey = provider === 'doubao' ? env.doubaoApiKey : env.aiApiKey
-  const model = provider === 'doubao' ? env.doubaoModel : env.aiModel
-  if (!apiKey) fail(500, 'AI_KEY_MISSING', `${provider.toUpperCase()} api key is not set`)
+  if (!env.aiApiKey) fail(500, 'AI_KEY_MISSING', 'AI_API_KEY is not set')
 
-  const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model,
-      temperature: 0.2,
-      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: payloadText }],
-    }),
+  const openai = new OpenAI({ apiKey: env.aiApiKey, baseURL: env.aiBaseUrl })
+  const completion = await openai.chat.completions.create({
+    model: env.aiModel,
+    temperature: 0.2,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: payloadText },
+    ],
   })
-  if (!response.ok) fail(502, 'AI_UPSTREAM_ERROR', await response.text())
 
-  const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }>; usage?: Record<string, unknown> }
-  const result = json.choices?.[0]?.message?.content?.trim()
+  const result = completion.choices[0]?.message?.content?.trim()
   if (!result) fail(502, 'AI_EMPTY_RESPONSE', 'ai response is empty')
 
-  return { mode: input.mode, provider, propertyIds: input.propertyIds, model, result, usage: json.usage ?? null }
+  return {
+    mode: input.mode,
+    provider,
+    propertyIds: input.propertyIds,
+    model: env.aiModel,
+    result,
+    usage: completion.usage ?? null,
+  }
 }
