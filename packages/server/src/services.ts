@@ -54,16 +54,23 @@ export async function refreshFixedCommuteForAll() {
   }
 
   const activeTarget = ensureTarget(targets, settings.activeTargetId)
-  const updated: Property[] = []
-
-  for (const row of rows) {
-    const minutes = await computeTransitMinutes(row, activeTarget)
-    updated.push({
-      ...row,
-      commuteCache: upsertCommuteCache(row.commuteCache, activeTarget.id, minutes),
-      updatedAt: new Date().toISOString(),
-    })
-  }
+  const updated = [...rows]
+  const queue = [...rows.entries()]
+  const workerCount = Math.max(1, Math.floor(env.commuteConcurrency))
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (queue.length > 0) {
+      const next = queue.shift()
+      if (!next) return
+      const [index, row] = next
+      const minutes = await computeTransitMinutes(row, activeTarget)
+      updated[index] = {
+        ...row,
+        commuteCache: upsertCommuteCache(row.commuteCache, activeTarget.id, minutes),
+        updatedAt: new Date().toISOString(),
+      }
+    }
+  })
+  await Promise.all(workers)
 
   await store.writeProperties(updated)
 
@@ -79,12 +86,12 @@ export async function refreshFixedCommuteForAll() {
 
 export async function queryTempCommute(target: Pick<Target, 'id' | 'name' | 'address' | 'lat' | 'lng'>) {
   const rows = await store.readProperties()
-  const results: Array<{ propertyId: string; minutes: number }> = []
-
-  for (const row of rows) {
-    const minutes = await computeTransitMinutes(row, target as Target)
-    results.push({ propertyId: row.id, minutes })
-  }
+  const results = await Promise.all(
+    rows.map(async (row) => ({
+      propertyId: row.id,
+      minutes: await computeTransitMinutes(row, target as Target),
+    })),
+  )
 
   return {
     target,
@@ -203,15 +210,24 @@ export async function deleteMediaObject(key: string) {
   return { deleted: true, key }
 }
 
+export async function deleteMediaAndDetach(params: { key: string; url?: string }) {
+  const deleted = await deleteMediaObject(params.key)
+  const rows = await store.readProperties()
+  const nextRows = rows.map((row) => {
+    const nextMedia = row.mediaUrls.filter((item) => item !== params.url && !item.includes(params.key))
+    if (nextMedia.length === row.mediaUrls.length) return row
+    return { ...row, mediaUrls: nextMedia, updatedAt: new Date().toISOString() }
+  })
+  await store.writeProperties(nextRows)
+  return deleted
+}
+
 export async function evaluateWithLLM(input: {
   mode: 'single' | 'compare'
   propertyIds: string[]
   customPrompt?: string
+  provider?: 'openai' | 'claude' | 'doubao'
 }) {
-  if (!env.aiApiKey) {
-    fail(500, 'AI_KEY_MISSING', 'AI_API_KEY is not set')
-  }
-
   const rows = await store.readProperties()
   const selected = rows.filter((item) => input.propertyIds.includes(item.id))
   if (selected.length === 0) {
@@ -221,46 +237,51 @@ export async function evaluateWithLLM(input: {
   const systemPrompt =
     '你是租房决策助手。请基于输入的结构化数据，输出可执行、具体、简洁的建议。重点比较通勤、租金、面积、燃气、水电、配套和风险点。'
   const userPrompt = input.customPrompt ?? '请给出最终建议，并说明理由与潜在风险。'
+  const provider = input.provider ?? (env.aiProvider as 'openai' | 'claude' | 'doubao')
+  const payloadText = JSON.stringify({ mode: input.mode, properties: selected, question: userPrompt }, null, 2)
 
-  const response = await fetch(`${env.aiBaseUrl.replace(/\/$/, '')}/chat/completions`, {
+  if (provider === 'claude') {
+    if (!env.claudeApiKey) fail(500, 'AI_KEY_MISSING', 'CLAUDE_API_KEY is not set')
+    const response = await fetch(`${env.claudeBaseUrl.replace(/\/$/, '')}/messages`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': env.claudeApiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: env.claudeModel,
+        max_tokens: 1200,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: payloadText }],
+      }),
+    })
+    if (!response.ok) fail(502, 'AI_UPSTREAM_ERROR', await response.text())
+    const json = (await response.json()) as { content?: Array<{ text?: string }>; usage?: Record<string, unknown> }
+    const result = json.content?.map((item) => item.text ?? '').join('\n').trim()
+    if (!result) fail(502, 'AI_EMPTY_RESPONSE', 'ai response is empty')
+    return { mode: input.mode, provider, propertyIds: input.propertyIds, model: env.claudeModel, result, usage: json.usage ?? null }
+  }
+
+  const baseUrl = provider === 'doubao' ? env.doubaoBaseUrl : env.aiBaseUrl
+  const apiKey = provider === 'doubao' ? env.doubaoApiKey : env.aiApiKey
+  const model = provider === 'doubao' ? env.doubaoModel : env.aiModel
+  if (!apiKey) fail(500, 'AI_KEY_MISSING', `${provider.toUpperCase()} api key is not set`)
+
+  const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${env.aiApiKey}`,
-    },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: env.aiModel,
+      model,
       temperature: 0.2,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        {
-          role: 'user',
-          content: JSON.stringify({ mode: input.mode, properties: selected, question: userPrompt }, null, 2),
-        },
-      ],
+      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: payloadText }],
     }),
   })
+  if (!response.ok) fail(502, 'AI_UPSTREAM_ERROR', await response.text())
 
-  if (!response.ok) {
-    const body = await response.text()
-    fail(502, 'AI_UPSTREAM_ERROR', `ai upstream failed: ${body.slice(0, 300)}`)
-  }
+  const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }>; usage?: Record<string, unknown> }
+  const result = json.choices?.[0]?.message?.content?.trim()
+  if (!result) fail(502, 'AI_EMPTY_RESPONSE', 'ai response is empty')
 
-  const json = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>
-    usage?: Record<string, unknown>
-  }
-
-  const content = json.choices?.[0]?.message?.content?.trim()
-  if (!content) {
-    fail(502, 'AI_EMPTY_RESPONSE', 'ai response is empty')
-  }
-
-  return {
-    mode: input.mode,
-    propertyIds: input.propertyIds,
-    model: env.aiModel,
-    result: content,
-    usage: json.usage ?? null,
-  }
+  return { mode: input.mode, provider, propertyIds: input.propertyIds, model, result, usage: json.usage ?? null }
 }

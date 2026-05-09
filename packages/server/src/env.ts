@@ -11,4 +11,12 @@ export const env = {
   aiBaseUrl: process.env.AI_BASE_URL ?? 'https://api.openai.com/v1',
   aiApiKey: process.env.AI_API_KEY ?? '',
   aiModel: process.env.AI_MODEL ?? 'gpt-4.1-mini',
+  aiProvider: process.env.AI_PROVIDER ?? 'openai',
+  claudeBaseUrl: process.env.CLAUDE_BASE_URL ?? 'https://api.anthropic.com/v1',
+  claudeApiKey: process.env.CLAUDE_API_KEY ?? '',
+  claudeModel: process.env.CLAUDE_MODEL ?? 'claude-3-5-sonnet-latest',
+  doubaoBaseUrl: process.env.DOUBAO_BASE_URL ?? 'https://ark.cn-beijing.volces.com/api/v3',
+  doubaoApiKey: process.env.DOUBAO_API_KEY ?? '',
+  doubaoModel: process.env.DOUBAO_MODEL ?? 'doubao-seed-1-6-250615',
+  commuteConcurrency: Number(process.env.COMMUTE_CONCURRENCY ?? 3),
 }
