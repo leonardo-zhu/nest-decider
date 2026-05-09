@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { store } from '../store.js'
-import { sanitizePropertyCreate, sanitizePropertyPatch } from '../validation.js'
+import { sanitizePropertyCreate, sanitizePropertyPatch, validateIntakeStage } from '../validation.js'
 
 export const propertyRoutes = new Hono()
 
@@ -37,6 +37,9 @@ propertyRoutes.post('/', async (c) => {
     return c.json({ error: parsed.error }, 400)
   }
 
+  const stage = c.req.query('stage') as 'stage1' | 'stage2' | undefined
+  validateIntakeStage(parsed.value, stage)
+
   const rows = await store.readProperties()
   if (rows.some((item) => item.id === parsed.value.id)) {
     return c.json({ error: 'property id already exists' }, 409)
@@ -62,6 +65,9 @@ propertyRoutes.put('/:id', async (c) => {
   if (!parsed.ok) {
     return c.json({ error: parsed.error }, 400)
   }
+
+  const stage = c.req.query('stage') as 'stage1' | 'stage2' | undefined
+  validateIntakeStage(parsed.value, stage)
 
   rows[index] = parsed.value
   await store.writeProperties(rows)

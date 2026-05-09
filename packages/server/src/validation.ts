@@ -1,4 +1,5 @@
-import type { Property, PropertyStatus, Settings, Target } from './types.js'
+import { fail } from './errors.js'
+import type { IntakeStage, Property, PropertyStatus, Settings, Target } from './types.js'
 
 function asString(value: unknown): string | undefined {
   return typeof value === 'string' ? value.trim() : undefined
@@ -126,6 +127,28 @@ export function sanitizePropertyPatch(existing: Property, payload: unknown, nowI
   }
 
   return { ok: true, value: withPricePerSqm(merged) }
+}
+
+function validateStage1Rules(row: Property): void {
+  if (!row.name || !row.address || row.lat === undefined || row.lng === undefined) {
+    fail(400, 'STAGE1_REQUIRED_MISSING', 'stage1 requires name/address/lat/lng')
+  }
+}
+
+function validateStage2Rules(row: Property): void {
+  if (row.price === undefined || row.area === undefined || !row.floor || !row.orientation || !row.decoration) {
+    fail(400, 'STAGE2_REQUIRED_MISSING', 'stage2 requires price/area/floor/orientation/decoration')
+  }
+}
+
+export function validateIntakeStage(row: Property, stage?: IntakeStage): void {
+  if (!stage) return
+  if (stage === 'stage1') {
+    validateStage1Rules(row)
+    return
+  }
+  validateStage1Rules(row)
+  validateStage2Rules(row)
 }
 
 export function sanitizeTargetCreate(payload: unknown, nowIso: string): { ok: true; value: Target } | { ok: false; error: string } {
