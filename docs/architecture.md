@@ -1,6 +1,6 @@
 # 租房对比地图工具 — 架构方案
 
-> MVP 阶段文档 · 技术栈：Vite + React / Hono / 火山引擎 TOS / 高德地图 JS API
+> 文档版本：v0.4 MVP · 技术栈：Vite + React / Hono / 火山引擎 TOS / 高德地图 JS API
 
 ---
 
@@ -23,7 +23,7 @@
 │  └─ /* → Hono      │
 │                     │
 │  Hono BFF (Node)    │
-│  ├─ 注入 amapSecret │
+│  ├─ 使用 Web Service 凭证 │
 │  ├─ 代理高德 API    │
 │  └─ 读写 properties.json│
 └──────────┬──────────┘
@@ -42,8 +42,8 @@
 |------|------|
 | ① 静态资源 | 浏览器从 TOS Endpoint 拉取前端 build 产物，国内 CDN 节点响应 |
 | ② API 调用 | 浏览器请求 `rent.leonardo-zhu.me`，Caddy 反代至 Hono；跨域，Hono 需加 CORS 头 |
-| ③ 媒体文件 | 图片 / 视频存于 TOS `media/` 目录，`houses.json` 里记录直链，浏览器直接拉取 |
-| ④ 高德代理 | Hono 在服务端注入 `securityJsCode`，转发高德 Web Service API |
+| ③ 媒体文件 | 图片 / 视频存于 TOS `media/` 目录，`properties.json` 里记录直链，浏览器直接拉取 |
+| ④ 高德代理 | Hono 使用服务端 Web Service 凭证转发高德 API 请求 |
 
 > TOS 使用自带 Endpoint URL，**不绑定自定义域名**，无备案要求。SPA 路由通过 TOS 静态网站托管的「默认 404 → index.html」配置支持。
 
@@ -58,7 +58,7 @@
 | 静态托管 | 火山引擎 TOS | 前端 build 产物 + 媒体文件，国内 CDN |
 | 地图 | 高德地图 JS API 2.0 | 前端引入，WebGL 渲染 |
 | 反代 | Caddy | HTTPS 终结，`rent.leonardo-zhu.me` → Hono |
-| 数据存储 | `houses.json`（MVP） | 存于 do-sg，Hono 直接读写 |
+| 数据存储 | `properties.json` + `targets.json` + `settings.json`（MVP） | 存于 do-sg，Hono 直接读写 |
 | 包管理 | pnpm workspace | 前后端 monorepo |
 | CI/CD | GitHub Actions | push 触发：build → 上传 TOS + 重启 Hono |
 
@@ -67,7 +67,7 @@
 ## 三、项目结构
 
 ```
-next-decider/
+nest-decider/
 ├── packages/
 │   ├── frontend/                  # Vite + React
 │   │   ├── src/
@@ -76,7 +76,7 @@ next-decider/
 │   │   │   │   ├── HouseCard.tsx  # 房源卡片（含图片/视频）
 │   │   │   │   └── FilterBar.tsx  # 筛选栏
 │   │   │   ├── api/
-│   │   │   │   └── client.ts      # axios /api/* 的封装
+│   │   │   │   └── client.ts      # axios 封装（baseURL 指向 rent.leonardo-zhu.me/api）
 │   │   │   └── main.tsx
 │   │   └── vite.config.ts
 │   │
@@ -90,7 +90,9 @@ next-decider/
 │       └── tsconfig.json
 │
 ├── data/
-│   └── houses.json                # 房源元数据
+│   ├── properties.json            # 房源元数据
+│   ├── targets.json               # 固定目标地点列表
+│   └── settings.json              # 当前激活目标等全局设置
 │
 ├── .github/
 │   └── workflows/
@@ -183,7 +185,7 @@ tosutil cp ./video.mp4 tos://your-bucket/media/house-001/tour.mp4 \
 }
 ```
 
-Hono 服务端也需加 CORS 中间件，允许来自 TOS Endpoint 的跨域请求：
+Hono 服务端也需加 CORS 中间件，允许来自 TOS Endpoint 的跨域请求。前端 `client.ts` 需显式设置 API baseURL 为 `https://rent.leonardo-zhu.me/api`，避免请求误发到 TOS 域名：
 
 ```ts
 import { cors } from 'hono/cors'
@@ -198,10 +200,17 @@ app.use('/api/*', cors({
 
 | 凭证 | 放在哪里 | 说明 |
 |------|----------|------|
-| `key` | 前端环境变量 `VITE_AMAP_KEY` | 可暴露，高德控制台绑定域名白名单 |
-| `securityJsCode` | 服务端环境变量 `AMAP_SECRET` | 不可暴露，Hono 代理时注入 |
+| `key` | 前端环境变量 `VITE_AMAP_KEY` | 用于前端高德 JS API，可暴露，高德控制台绑定域名白名单 |
+| `securityJsCode` | 前端运行时配置 | 与 JS API 配合进行安全校验，不在业务接口中透传 |
+| `AMAP_WEB_KEY` | 服务端环境变量 | 用于 Hono 代理调用高德 Web Service API（路径规划 / 地理编码 / POI） |
+| `AMAP_WEB_SIG`（可选） | 服务端环境变量 | 如启用 Web Service 数字签名，则由服务端计算并附加 `sig` 参数 |
 
 高德控制台域名白名单填 `rent.leonardo-zhu.me`。
+
+说明：
+- 前端只使用 JS API 相关凭证（`key` + `securityJsCode`）。
+- 后端只使用 Web Service 凭证（`AMAP_WEB_KEY`，以及可选 `AMAP_WEB_SIG`）。
+- 前端展示通勤时间时仅使用单一总耗时；后端可返回方案明细但前端不强制展示。
 
 ### Hono 代理实现思路
 
@@ -210,8 +219,9 @@ app.use('/api/*', cors({
 app.get('/api/amap/*', async (c) => {
   const path = c.req.path.replace('/api/amap', '')
   const url = new URL(`https://restapi.amap.com${path}`)
-  url.searchParams.set('key', process.env.AMAP_KEY!)
-  url.searchParams.set('sig', process.env.AMAP_SECRET!)
+  url.searchParams.set('key', process.env.AMAP_WEB_KEY!)
+  // 如果启用 Web Service 数字签名，由服务端生成并附加
+  // url.searchParams.set('sig', buildAmapSig(url, process.env.AMAP_WEB_SIG!))
   const res = await fetch(url.toString())
   return c.json(await res.json())
 })
@@ -300,7 +310,8 @@ jobs:
 | `DO_SG_HOST` | do-sg 服务器 IP |
 | `DO_SG_SSH_KEY` | deployer 用户的 SSH 私钥 |
 | `VITE_AMAP_KEY` | 高德 JS API key（前端用） |
-| `AMAP_SECRET` | 高德 securityJsCode（pm2 环境变量注入） |
+| `AMAP_WEB_KEY` | 高德 Web Service key（pm2 环境变量注入） |
+| `AMAP_WEB_SIG` | 高德 Web Service 数字签名密钥（可选，pm2 环境变量注入） |
 
 ---
 
@@ -310,10 +321,10 @@ jobs:
 |------|--------|-------------|
 | 地图上展示所有房源 pin | P0 | JS API（Marker） |
 | 点击 pin 展示详情卡片（含图片/视频） | P0 | 无 |
-| 输入工作地点，显示各房源通勤时间 | P0 | 路径规划（公交/步行） |
-| 公交到达圈（X 分钟内可达范围） | P1 | ArrivalRange |
+| 输入工作地点，显示各房源通勤时间 | P0 | 路径规划（公共交通，默认地铁优先；总耗时含步行接驳） |
+| 公共交通到达圈（X 分钟内可达范围） | P1 | ArrivalRange |
 | 周边 POI 搜索（超市 / 地铁站 / 医院） | P1 | PlaceSearch.searchNearBy |
-| 房源增删改（简单表单） | P1 | 无（Hono + JSON） |
+| 房源增删改（简单表单） | P0 | 无（Hono + JSON） |
 | 地理编码（输入地址自动定位） | P1 | Geocoder |
 
 ---
@@ -327,4 +338,4 @@ jobs:
 
 ---
 
-*文档版本：MVP v0.3 · 待 PRD 确认后进入开发*
+*文档版本：Architecture v0.4 · 已与 PRD v0.2 对齐*
