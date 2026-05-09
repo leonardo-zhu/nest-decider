@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { ok } from '../http.js'
-import { createMediaUploadPresign, deleteMediaObject } from '../services.js'
+import { createMediaUploadPresign, deleteMediaAndDetach } from '../services.js'
 
 export const mediaRoutes = new Hono()
 
@@ -21,11 +21,12 @@ mediaRoutes.post('/presign-upload', async (c) => {
 mediaRoutes.delete('/', async (c) => {
   const body = (await c.req.json()) as Record<string, unknown>
   const key = typeof body.key === 'string' ? body.key.trim() : ''
+  const url = typeof body.url === 'string' ? body.url.trim() : undefined
 
   if (!key) {
     return c.json({ ok: false, error: { code: 'BAD_REQUEST', message: 'key is required' } }, 400)
   }
 
-  const data = await deleteMediaObject(key)
+  const data = await deleteMediaAndDetach({ key, url })
   return ok(c, data)
 })
