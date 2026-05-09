@@ -1,7 +1,7 @@
 import OpenAI from 'openai'
-import { env } from './env.js'
-import { fail } from './errors.js'
-import { arrivalRange, nearbyPoi, transitRoute } from './amap-client.js'
+import { env } from '../config/env.js'
+import { fail } from '../core/errors.js'
+import { arrivalRange, nearbyPoi, transitRoute } from '../clients/amap-client.js'
 import { store } from './store.js'
 import type { CommuteCacheItem, Property, Target } from './types.js'
 

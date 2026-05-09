@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
-import { ok } from '../http.js'
-import { geocodeAddress } from '../amap-client.js'
-import { queryTempCommute, refreshFixedCommuteForAll } from '../services.js'
+import { ok } from '../core/http.js'
+import { geocodeAddress } from '../clients/amap-client.js'
+import { queryTempCommute, refreshFixedCommuteForAll } from '../domains/services.js'
 
 export const commuteRoutes = new Hono()
 

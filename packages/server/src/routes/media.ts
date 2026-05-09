@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { ok } from '../http.js'
-import { createMediaUploadPresign, deleteMediaAndDetach } from '../services.js'
+import { ok } from '../core/http.js'
+import { createMediaUploadPresign, deleteMediaAndDetach } from '../domains/services.js'
 
 export const mediaRoutes = new Hono()
 

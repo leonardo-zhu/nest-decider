@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { ok } from '../http.js'
-import { getPoiByProperty } from '../services.js'
+import { ok } from '../core/http.js'
+import { getPoiByProperty } from '../domains/services.js'
 
 export const poiRoutes = new Hono()
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sanitizePropertyCreate } from './validation.js'
+import { sanitizePropertyCreate } from './domains/validation.js'
 
 describe('validation', () => {
   it('calculates pricePerSqm', () => {

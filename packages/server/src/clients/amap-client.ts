@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
-import { env } from './env.js'
-import { fail } from './errors.js'
+import { env } from '../config/env.js'
+import { fail } from '../core/errors.js'
 
 function withSig(url: URL): void {
   if (!env.amapWebSig) return
