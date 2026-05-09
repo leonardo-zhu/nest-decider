@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { store } from '../store.js'
-import { sanitizePropertyCreate, sanitizePropertyPatch, validateIntakeStage } from '../validation.js'
+import { store } from '../domains/store.js'
+import { sanitizePropertyCreate, sanitizePropertyPatch, validateIntakeStage } from '../domains/validation.js'
 
 export const propertyRoutes = new Hono()
 

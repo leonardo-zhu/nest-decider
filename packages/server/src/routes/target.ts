@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { store } from '../store.js'
-import { sanitizeSettings, sanitizeTargetCreate } from '../validation.js'
+import { store } from '../domains/store.js'
+import { sanitizeSettings, sanitizeTargetCreate } from '../domains/validation.js'
 
 export const targetRoutes = new Hono()
 

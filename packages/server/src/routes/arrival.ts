@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { ok } from '../http.js'
-import { getArrivalRange } from '../services.js'
+import { ok } from '../core/http.js'
+import { getArrivalRange } from '../domains/services.js'
 
 export const arrivalRoutes = new Hono()
 

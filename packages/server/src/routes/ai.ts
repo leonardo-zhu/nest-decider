@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { ok } from '../http.js'
-import { evaluateWithLLM } from '../services.js'
+import { ok } from '../core/http.js'
+import { evaluateWithLLM } from '../domains/services.js'
 
 export const aiRoutes = new Hono()
 

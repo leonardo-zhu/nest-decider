@@ -1,4 +1,4 @@
-import { fail } from './errors.js'
+import { fail } from '../core/errors.js'
 import type { IntakeStage, Property, PropertyStatus, Settings, Target } from './types.js'
 
 function asString(value: unknown): string | undefined {
