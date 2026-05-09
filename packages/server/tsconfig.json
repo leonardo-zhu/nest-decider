@@ -6,7 +6,9 @@
     "strict": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "types": ["node", "vitest/globals"],
+    "resolveJsonModule": true
   },
   "include": ["src"]
 }
