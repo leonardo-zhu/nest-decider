@@ -7,10 +7,7 @@ export const aiRoutes = new Hono()
 aiRoutes.post('/evaluate', async (c) => {
   const body = (await c.req.json()) as Record<string, unknown>
   const mode = body.mode === 'compare' ? 'compare' : 'single'
-  const provider =
-    body.provider === 'claude' || body.provider === 'doubao' || body.provider === 'openai'
-      ? body.provider
-      : undefined
+  const provider = body.provider === 'doubao' || body.provider === 'openai' ? body.provider : undefined
   const propertyIds = Array.isArray(body.propertyIds)
     ? body.propertyIds.filter((item): item is string => typeof item === 'string')
     : []
