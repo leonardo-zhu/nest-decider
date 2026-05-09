@@ -48,6 +48,8 @@ export interface Property {
   updatedAt: string
 }
 
+export type IntakeStage = 'stage1' | 'stage2'
+
 export interface Target {
   id: string
   name: string
