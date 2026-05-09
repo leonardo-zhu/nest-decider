@@ -1,0 +1,31 @@
+:root {
+  font-family: "PingFang SC", "Noto Sans SC", sans-serif;
+  color: #101828;
+  background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.topbar h1 {
+  margin: 0;
+}
+
+.panel {
+  margin-top: 20px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #d0d5dd;
+}
