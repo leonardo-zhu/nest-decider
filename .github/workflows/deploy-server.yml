@@ -1,0 +1,41 @@
+name: Deploy Server
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'packages/server/**'
+      - 'data/**'
+      - 'pnpm-lock.yaml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter server build
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            git pull origin master
+            pnpm install --frozen-lockfile
+            pnpm --filter server build
+            pm2 restart nest-decider-server || pm2 start packages/server/dist/index.js --name nest-decider-server
