@@ -152,12 +152,11 @@ export function PropertyDetail({ property, onBack, onEdit }: PropertyDetailProps
               <span className="field-value">{property.managementFee} 元/月</span>
             </div>
           )}
-          {property.network && (
+          {property.internet && (
             <div className="detail-field">
               <span className="field-label">网络</span>
               <span className="field-value">
-                {property.network === 'included' ? '包网' : property.network === 'self' ? '可自接' : '不可接'}
-                {property.networkNote && ` (${property.networkNote})`}
+                {renderInternetSummary(property)}
               </span>
             </div>
           )}
@@ -196,4 +195,34 @@ export function PropertyDetail({ property, onBack, onEdit }: PropertyDetailProps
       )}
     </div>
   )
+}
+
+function renderInternetSummary(property: Property): string {
+  const internet = property.internet
+  if (!internet) return '-'
+
+  const provided = internet.provided.available
+    ? (
+      internet.provided.billing === 'included'
+        ? '房东提供（包网）'
+        : internet.provided.billing === 'extra'
+          ? `房东提供（额外${internet.provided.monthlyFee ?? '-'}元/月）`
+          : '房东提供（计费未知）'
+    )
+    : '房东不提供'
+  const bandwidth = internet.provided.available && internet.provided.bandwidthDownMbps != null
+    ? `，下行${internet.provided.bandwidthDownMbps}Mbps`
+    : ''
+
+  const selfInstall = internet.selfInstall.allowed
+    ? (
+      internet.selfInstall.carrierCoverage === 'covered'
+        ? '，支持自接（运营商覆盖）'
+        : internet.selfInstall.carrierCoverage === 'not_covered'
+          ? '，支持自接（运营商不覆盖）'
+          : '，支持自接（覆盖未知）'
+    )
+    : '，不支持自接'
+
+  return `${provided}${bandwidth}${selfInstall}`
 }

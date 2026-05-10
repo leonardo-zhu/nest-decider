@@ -71,6 +71,24 @@ declare namespace AMap {
     getCurrentPosition(callback: (status: string, result: Record<string, unknown>) => void): void
   }
 
+  interface AutoCompleteResultItem {
+    name: string
+    district?: string
+    address?: string
+    location?: { lng: number; lat: number }
+  }
+
+  class AutoComplete {
+    constructor(opts?: Record<string, unknown>)
+    search(
+      keyword: string,
+      callback: (
+        status: string,
+        result: { tips?: AutoCompleteResultItem[] }
+      ) => void
+    ): void
+  }
+
   class CitySearch {
     constructor()
     getLocalCity(callback: (status: string, result: { city?: string; bounds?: Bounds }) => void): void
@@ -90,6 +108,7 @@ declare namespace AMap {
   }
 
   function load(cb: () => void): void
+  function plugin(name: string, cb: () => void): void
 }
 
 interface Window {

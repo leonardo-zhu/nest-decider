@@ -44,7 +44,10 @@ export function App() {
     if (editingProperty) {
       await properties.update(editingProperty.id, data)
     } else {
-      await properties.create(data)
+      await properties.create({
+        ...data,
+        id: `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+      })
     }
     setEditingProperty(null)
     setViewMode('list')
@@ -125,6 +128,7 @@ export function App() {
             {viewMode === 'form' ? (
               <PropertyForm
                 property={editingProperty}
+                properties={properties.data}
                 onSave={handleFormSave}
                 onClose={handleFormClose}
               />
