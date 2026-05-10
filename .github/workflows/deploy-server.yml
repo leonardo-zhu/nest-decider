@@ -37,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           pnpm install --frozen-lockfile
-          pnpm build
+          pnpm --filter server build
 
       - name: Pack Release
         env:
@@ -45,14 +45,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .release/app
-          rsync -a ./ .release/app/ \
-            --exclude '.git' \
-            --exclude '.github' \
-            --exclude '.claude' \
-            --exclude '.env' \
-            --exclude '.env.*' \
-            --exclude 'tests' \
-            --exclude '*.log'
+
+          # Build a flattened, production-ready server artifact with pnpm only.
+          pnpm --filter server deploy --legacy --prod .release/app
+
+          # PM2 entry file lives at repo root, keep release root runnable.
+          cp ecosystem.config.cjs .release/app/
           tar -C .release -czf ".release/release-${RELEASE_ID}.tgz" app
 
       - name: Deploy via SSH
