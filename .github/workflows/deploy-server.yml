@@ -37,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           pnpm install --frozen-lockfile
-          pnpm --filter server build
+          pnpm build
 
       - name: Pack Release
         env:
@@ -45,17 +45,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .release/app
-
-          # Server code at root level
-          rsync -a packages/server/ .release/app/ \
-            --exclude 'node_modules'
-
-          # Data, config, dependencies from project root
-          cp ecosystem.config.cjs .release/app/
-          cp package.json .release/app/package.json
-          cp pnpm-lock.yaml .release/app/pnpm-lock.yaml
-          rsync -a node_modules/ .release/app/node_modules/
-
+          rsync -a ./ .release/app/ \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude '.claude' \
+            --exclude '.env' \
+            --exclude '.env.*' \
+            --exclude 'tests' \
+            --exclude '*.log'
           tar -C .release -czf ".release/release-${RELEASE_ID}.tgz" app
 
       - name: Deploy via SSH
