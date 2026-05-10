@@ -1,12 +1,11 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import type { Property, Settings, Target } from './types.js'
+import { env } from '../config/env.js'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const dataDir = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : path.resolve(__dirname, '..', 'data')
+const dataDir = env.dataDir
+  ? path.resolve(env.dataDir)
+  : path.resolve(process.cwd(), 'data')
 
 async function readJsonFile<T>(fileName: string, fallback: T): Promise<T> {
   const fullPath = path.join(dataDir, fileName)
@@ -20,6 +19,7 @@ async function readJsonFile<T>(fileName: string, fallback: T): Promise<T> {
 
 async function writeJsonFile<T>(fileName: string, data: T): Promise<void> {
   const fullPath = path.join(dataDir, fileName)
+  await fs.mkdir(dataDir, { recursive: true })
   await fs.writeFile(fullPath, JSON.stringify(data, null, 2), 'utf-8')
 }
 

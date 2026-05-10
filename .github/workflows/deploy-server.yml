@@ -108,9 +108,11 @@ jobs:
           RELEASES_DIR="$DEPLOY_PATH/releases"
           RELEASE_DIR="$RELEASES_DIR/$RELEASE_ID"
           CURRENT_LINK="$DEPLOY_PATH/current"
+          SHARED_DIR="$DEPLOY_PATH/shared"
 
           mkdir -p "$RELEASES_DIR"
           mkdir -p "$RELEASE_DIR"
+          mkdir -p "$SHARED_DIR/data"
 
           tar -xzf "/tmp/$ARCHIVE_NAME" -C "$RELEASE_DIR" --strip-components=1
           ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
@@ -123,6 +125,7 @@ jobs:
           if [ -n "$DEPLOY_SERVICE_ENV_FILE" ] && [ -f "$DEPLOY_SERVICE_ENV_FILE" ]; then
             . "$DEPLOY_SERVICE_ENV_FILE"
           fi
+          : "${DATA_DIR:=$SHARED_DIR/data}"
           set +a
 
           pm2 delete "$DEPLOY_PM2_NAME" 2>/dev/null || true
