@@ -29,6 +29,25 @@ targetRoutes.post('/', async (c) => {
   return c.json(parsed.value, 201)
 })
 
+targetRoutes.put('/active', async (c) => {
+  const payload = await c.req.json()
+  const parsed = sanitizeSettings(payload)
+
+  if (!parsed.ok) {
+    return c.json({ error: parsed.error }, 400)
+  }
+
+  if (parsed.value.activeTargetId !== null) {
+    const rows = await store.readTargets()
+    if (!rows.some((item) => item.id === parsed.value.activeTargetId)) {
+      return c.json({ error: 'target not found' }, 404)
+    }
+  }
+
+  await store.writeSettings(parsed.value)
+  return c.json({ ok: true, ...parsed.value })
+})
+
 targetRoutes.put('/:id', async (c) => {
   const id = c.req.param('id')
   const payload = await c.req.json()
@@ -78,35 +97,4 @@ targetRoutes.delete('/:id', async (c) => {
   }
 
   return c.json({ ok: true })
-})
-
-targetRoutes.put('/active/:id', async (c) => {
-  const id = c.req.param('id')
-  const rows = await store.readTargets()
-
-  if (!rows.some((item) => item.id === id)) {
-    return c.json({ error: 'target not found' }, 404)
-  }
-
-  await store.writeSettings({ activeTargetId: id })
-  return c.json({ ok: true, activeTargetId: id })
-})
-
-targetRoutes.put('/active', async (c) => {
-  const payload = await c.req.json()
-  const parsed = sanitizeSettings(payload)
-
-  if (!parsed.ok) {
-    return c.json({ error: parsed.error }, 400)
-  }
-
-  if (parsed.value.activeTargetId !== null) {
-    const rows = await store.readTargets()
-    if (!rows.some((item) => item.id === parsed.value.activeTargetId)) {
-      return c.json({ error: 'target not found' }, 404)
-    }
-  }
-
-  await store.writeSettings(parsed.value)
-  return c.json({ ok: true, ...parsed.value })
 })
