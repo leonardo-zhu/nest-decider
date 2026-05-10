@@ -18,6 +18,34 @@ function asStringArray(value: unknown): string[] {
   return value.filter((v): v is string => typeof v === 'string' && v.length > 0)
 }
 
+function asInternetInfo(value: unknown): Property['internet'] {
+  if (typeof value !== 'object' || value === null) return undefined
+  const row = value as Record<string, unknown>
+  const providedRaw = (typeof row.provided === 'object' && row.provided !== null)
+    ? row.provided as Record<string, unknown>
+    : {}
+  const selfInstallRaw = (typeof row.selfInstall === 'object' && row.selfInstall !== null)
+    ? row.selfInstall as Record<string, unknown>
+    : {}
+
+  const providedAvailable = asBoolean(providedRaw.available) ?? false
+  const billing = asString(providedRaw.billing)
+  const coverage = asString(selfInstallRaw.carrierCoverage)
+
+  return {
+    provided: {
+      available: providedAvailable,
+      billing: billing === 'included' || billing === 'extra' || billing === 'unknown' ? billing : undefined,
+      monthlyFee: asNumber(providedRaw.monthlyFee),
+      bandwidthDownMbps: asNumber(providedRaw.bandwidthDownMbps),
+    },
+    selfInstall: {
+      allowed: asBoolean(selfInstallRaw.allowed) ?? false,
+      carrierCoverage: coverage === 'covered' || coverage === 'not_covered' || coverage === 'unknown' ? coverage : undefined,
+    },
+  }
+}
+
 function isStatus(value: unknown): value is PropertyStatus {
   return value === 'pending' || value === 'viewed' || value === 'excluded'
 }
@@ -70,8 +98,7 @@ export function sanitizePropertyCreate(payload: unknown, nowIso: string): { ok: 
     electricityFee: asNumber(row.electricityFee),
     waterFee: asNumber(row.waterFee),
     managementFee: asNumber(row.managementFee),
-    network: asString(row.network) as Property['network'],
-    networkNote: asString(row.networkNote),
+    internet: asInternetInfo(row.internet),
     fridge: asString(row.fridge),
     hasBalcony: asBoolean(row.hasBalcony),
     parking: asString(row.parking) as Property['parking'],
@@ -111,8 +138,7 @@ export function sanitizePropertyPatch(existing: Property, payload: unknown, nowI
     ...('electricityFee' in row ? { electricityFee: asNumber(row.electricityFee) } : {}),
     ...('waterFee' in row ? { waterFee: asNumber(row.waterFee) } : {}),
     ...('managementFee' in row ? { managementFee: asNumber(row.managementFee) } : {}),
-    ...('network' in row ? { network: asString(row.network) as Property['network'] } : {}),
-    ...('networkNote' in row ? { networkNote: asString(row.networkNote) } : {}),
+    ...('internet' in row ? { internet: asInternetInfo(row.internet) } : {}),
     ...('fridge' in row ? { fridge: asString(row.fridge) } : {}),
     ...('hasBalcony' in row ? { hasBalcony: asBoolean(row.hasBalcony) } : {}),
     ...('parking' in row ? { parking: asString(row.parking) as Property['parking'] } : {}),

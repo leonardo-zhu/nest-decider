@@ -2,14 +2,28 @@ export type PropertyStatus = 'pending' | 'viewed' | 'excluded'
 export type PropertyType = 'residential' | 'urban-village' | 'standalone-urban' | 'standalone'
 export type RoomType = 'studio' | 'large-studio' | '1b1l' | '2b1l' | 'loft'
 export type Decoration = 'luxury' | 'simple'
-export type NetworkType = 'included' | 'self' | 'unavailable'
 export type ParkingType = 'available' | 'unavailable'
+export type NetworkBillingType = 'included' | 'extra' | 'unknown'
+export type CarrierCoverageType = 'covered' | 'not_covered' | 'unknown'
 
 export interface CommuteCacheItem {
   targetId: string
   minutes: number
   mode: 'transit'
   updatedAt: string
+}
+
+export interface InternetInfo {
+  provided: {
+    available: boolean
+    billing?: NetworkBillingType
+    monthlyFee?: number
+    bandwidthDownMbps?: number
+  }
+  selfInstall: {
+    allowed: boolean
+    carrierCoverage?: CarrierCoverageType
+  }
 }
 
 export interface Property {
@@ -32,8 +46,7 @@ export interface Property {
   electricityFee?: number
   waterFee?: number
   managementFee?: number
-  network?: NetworkType
-  networkNote?: string
+  internet?: InternetInfo
   fridge?: string
   hasBalcony?: boolean
   parking?: ParkingType
