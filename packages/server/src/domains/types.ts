@@ -29,6 +29,8 @@ export interface InternetInfo {
 export interface Property {
   id: string
   name: string
+  agentWechatId?: string
+  agentWechatName?: string
   address: string
   lat: number
   lng: number
@@ -52,8 +54,6 @@ export interface Property {
   parking?: ParkingType
   parkingNote?: string
   note?: string
-
-  pricePerSqm?: number
   mediaUrls: string[]
   commuteCache?: CommuteCacheItem[]
 

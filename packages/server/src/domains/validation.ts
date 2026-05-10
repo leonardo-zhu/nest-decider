@@ -50,17 +50,6 @@ function isStatus(value: unknown): value is PropertyStatus {
   return value === 'pending' || value === 'viewed' || value === 'excluded'
 }
 
-function withPricePerSqm(input: Omit<Property, 'pricePerSqm'>): Property {
-  const hasValidArea = typeof input.area === 'number' && input.area > 0
-  const hasValidPrice = typeof input.price === 'number' && input.price >= 0
-  const pricePerSqm = hasValidArea && hasValidPrice ? Number((input.price! / input.area!).toFixed(2)) : undefined
-
-  return {
-    ...input,
-    pricePerSqm,
-  }
-}
-
 export function sanitizePropertyCreate(payload: unknown, nowIso: string): { ok: true; value: Property } | { ok: false; error: string } {
   if (typeof payload !== 'object' || payload === null) {
     return { ok: false, error: 'invalid payload' }
@@ -69,6 +58,8 @@ export function sanitizePropertyCreate(payload: unknown, nowIso: string): { ok: 
   const row = payload as Record<string, unknown>
   const id = asString(row.id)
   const name = asString(row.name)
+  const agentWechatId = asString(row.agentWechatId)
+  const agentWechatName = asString(row.agentWechatName)
   const address = asString(row.address)
   const lat = asNumber(row.lat)
   const lng = asNumber(row.lng)
@@ -76,12 +67,17 @@ export function sanitizePropertyCreate(payload: unknown, nowIso: string): { ok: 
   if (!id || !name || !address || lat === undefined || lng === undefined) {
     return { ok: false, error: 'id/name/address/lat/lng are required' }
   }
+  if (!agentWechatId && !agentWechatName) {
+    return { ok: false, error: 'agentWechatId or agentWechatName is required' }
+  }
 
   const status = isStatus(row.status) ? row.status : 'pending'
 
-  const value = withPricePerSqm({
+  const value: Property = {
     id,
     name,
+    agentWechatId,
+    agentWechatName,
     address,
     lat,
     lng,
@@ -108,7 +104,7 @@ export function sanitizePropertyCreate(payload: unknown, nowIso: string): { ok: 
     commuteCache: Array.isArray(row.commuteCache) ? (row.commuteCache as Property['commuteCache']) : [],
     createdAt: asString(row.createdAt) ?? nowIso,
     updatedAt: nowIso,
-  })
+  }
 
   return { ok: true, value }
 }
@@ -119,9 +115,11 @@ export function sanitizePropertyPatch(existing: Property, payload: unknown, nowI
   }
 
   const row = payload as Record<string, unknown>
-  const merged: Omit<Property, 'pricePerSqm'> = {
+  const merged: Property = {
     ...existing,
     ...('name' in row ? { name: asString(row.name) ?? existing.name } : {}),
+    ...('agentWechatId' in row ? { agentWechatId: asString(row.agentWechatId) } : {}),
+    ...('agentWechatName' in row ? { agentWechatName: asString(row.agentWechatName) } : {}),
     ...('address' in row ? { address: asString(row.address) ?? existing.address } : {}),
     ...('lat' in row ? { lat: asNumber(row.lat) ?? existing.lat } : {}),
     ...('lng' in row ? { lng: asNumber(row.lng) ?? existing.lng } : {}),
@@ -152,12 +150,12 @@ export function sanitizePropertyPatch(existing: Property, payload: unknown, nowI
     updatedAt: nowIso,
   }
 
-  return { ok: true, value: withPricePerSqm(merged) }
+  return { ok: true, value: merged }
 }
 
 function validateStage1Rules(row: Property): void {
-  if (!row.name || !row.address || row.lat === undefined || row.lng === undefined) {
-    fail(400, 'STAGE1_REQUIRED_MISSING', 'stage1 requires name/address/lat/lng')
+  if (!row.name || (!row.agentWechatId && !row.agentWechatName) || !row.address || row.lat === undefined || row.lng === undefined) {
+    fail(400, 'STAGE1_REQUIRED_MISSING', 'stage1 requires name/(agentWechatId or agentWechatName)/address/lat/lng')
   }
 }
 
