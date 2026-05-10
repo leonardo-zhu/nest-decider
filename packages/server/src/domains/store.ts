@@ -2,7 +2,9 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import type { Property, Settings, Target } from './types.js'
 
-const dataDir = path.resolve(process.cwd(), '..', '..', 'data')
+const dataDir = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.resolve(process.cwd(), 'data')
 
 async function readJsonFile<T>(fileName: string, fallback: T): Promise<T> {
   const fullPath = path.join(dataDir, fileName)

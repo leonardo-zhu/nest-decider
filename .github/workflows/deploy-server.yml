@@ -48,7 +48,7 @@ jobs:
 
           cp -r packages/server/dist .release/app/server-dist
           cp packages/server/package.json .release/app/server-package.json
-          cp -r data .release/app/data
+          cp -r packages/server/data .release/app/data
           cp ecosystem.config.cjs .release/app/
 
           tar -C .release -czf ".release/release-${RELEASE_ID}.tgz" app

@@ -24,4 +24,5 @@ for (const fileName of envCandidates) {
 export const env = {
   port: Number(process.env.PORT ?? 8787),
   corsOrigin: process.env.CORS_ORIGIN ?? '*',
+  dataDir: process.env.DATA_DIR ?? '',
 }
