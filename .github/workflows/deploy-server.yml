@@ -48,13 +48,16 @@ jobs:
 
           # Server code at root level
           rsync -a packages/server/ .release/app/ \
-            --exclude 'node_modules'
+            --exclude 'node_modules' \
+            --exclude 'src'
 
-          # Data, config, dependencies from project root
+          # Config and production dependencies
           cp ecosystem.config.cjs .release/app/
-          cp package.json .release/app/package.json
-          cp pnpm-lock.yaml .release/app/pnpm-lock.yaml
-          rsync -a node_modules/ .release/app/node_modules/
+          cp packages/server/package.json .release/app/package.json
+
+          cd .release/app
+          npm install --production --no-audit --no-fund
+          cd ../..
 
           tar -C .release -czf ".release/release-${RELEASE_ID}.tgz" app
 
