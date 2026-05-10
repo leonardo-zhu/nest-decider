@@ -47,7 +47,7 @@ jobs:
           mkdir -p .release/app
 
           cp -r packages/server/dist .release/app/server-dist
-          cp packages/server/package.json .release/app/server-package.json
+          cp packages/server/package.json .release/app/package.json
           cp -r packages/server/data .release/app/data
           cp ecosystem.config.cjs .release/app/
 
@@ -115,6 +115,8 @@ jobs:
           tar -xzf "/tmp/$ARCHIVE_NAME" -C "$RELEASE_DIR" --strip-components=1
           ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
           cd "$CURRENT_LINK"
+
+          npm install --production
 
           set -a
           if [ -f "$DEPLOY_ENV_FILE" ]; then
